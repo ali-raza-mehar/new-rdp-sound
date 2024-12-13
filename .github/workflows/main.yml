@@ -29,8 +29,12 @@ jobs:
         # Set User Password for RDP
         Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
         # Ensure RDP Service is Running
-        sc.exe config TermService start= auto
-        sc.exe start TermService
+        if ((Get-Service -Name TermService).Status -ne "Running") {
+          sc.exe config TermService start= auto
+          sc.exe start TermService
+        } else {
+          Write-Output "TermService is already running"
+        }
 
     - name: Enable Audio for RDP
       run: |
@@ -38,7 +42,11 @@ jobs:
         Set-ItemProperty -Path 'HKLM:\Software\Policies\Microsoft\Windows NT\Terminal Services' -Name "fDisableAudio" -Value 0
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "AudioMode" -Value 0
         # Start Windows Audio Service
-        Start-Service -Name "Audiosrv"
+        if ((Get-Service -Name Audiosrv).Status -ne "Running") {
+          Start-Service -Name "Audiosrv"
+        } else {
+          Write-Output "Audiosrv is already running"
+        }
 
     - name: Check Services and Ports
       run: |
