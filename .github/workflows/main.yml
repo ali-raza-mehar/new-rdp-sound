@@ -12,23 +12,45 @@ jobs:
       run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
     - name: Extract Ngrok
       run: Expand-Archive ngrok.zip -DestinationPath ngrok
+
     - name: Authenticate Ngrok
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Enable RDP Connections
+    - name: Enable RDP and Configure Firewall
       run: |
+        # Enable RDP Connections
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        # Enable Remote Desktop Firewall Rule
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        # Configure RDP Authentication
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+        # Set User Password for RDP
         Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+        # Ensure RDP Service is Running
+        sc.exe config TermService start= auto
+        sc.exe start TermService
 
-    - name: Enable Remote Audio
+    - name: Enable Audio for RDP
       run: |
+        # Enable Audio Redirection
         Set-ItemProperty -Path 'HKLM:\Software\Policies\Microsoft\Windows NT\Terminal Services' -Name "fDisableAudio" -Value 0
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "AudioMode" -Value 0
+        # Start Windows Audio Service
         Start-Service -Name "Audiosrv"
+
+    - name: Check Services and Ports
+      run: |
+        # Check RDP Service Status
+        Get-Service -Name TermService
+        # Check Windows Audio Service Status
+        Get-Service -Name Audiosrv
+        # List Open Ports
+        netstat -an | findstr 3389
 
     - name: Start Ngrok Tunnel
       run: .\ngrok\ngrok.exe tcp 3389
+
+    - name: Output Ngrok URL
+      run: curl http://127.0.0.1:4040/api/tunnels
